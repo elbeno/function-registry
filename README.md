@@ -57,3 +57,29 @@ for more examples.
 * The code is written for a standards-compliant C++14 compiler, although with
   only a few changes, C++98 would work (a little less efficiently and
   elegantly).
+* Speed (see note below).
+
+## Performance
+
+This library offers flexibility in loosely coupling parts of your program, at
+the cost of raw performance. A dispatch incurs a map lookup, a vector traversal
+and a virtual function call in addition to the actual function call. Relative
+performance is going to be dependent on the number of types and handlers of each
+type that are registered, but you should expect it to be at least 4-5x
+slower than a standard virtual function call achieved through an interface.
+
+Performance may be improved by altering the data structures according to your
+needs (changing `Registry`'s `std::unordered_map` for `std::map`, or
+`boost::flat_map`, or for a `std::vector`, if you can statically assign
+monotonically increasing indices as your `type_key`s).
+
+## Building and Testing
+
+The library itself is header-only, but to build and run tests:
+
+```bash
+~/function-registry$ scons
+~/function-registry$ ./export/debug/bin/function-registry_test
+All tests passed.
+~/function-registry$
+```
