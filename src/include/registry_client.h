@@ -6,11 +6,6 @@
 // registry. Handles storage of tokens for unregistering by type and cleanup on
 // deletion.
 
-bool operator<(const Registry::Token& a, const Registry::Token& b)
-{
-  return a.m_id < b.m_id;
-}
-
 class RegistryClient
 {
   using Token = Registry::Token;
@@ -20,6 +15,7 @@ public:
     : m_registry(r)
   {}
 
+  // On destruction, unregister all functions.
   virtual ~RegistryClient()
   {
     UnregisterAll();
