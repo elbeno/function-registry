@@ -115,7 +115,7 @@ public:
   {
     auto& v = m_handlers[t.m_k];
     auto i = std::lower_bound(v.cbegin(), v.cend(), t.m_id,
-                              [] (const HandlerWrapper& h, int id)
+                              [] (const HandlerWrapper& h, id_t id)
                               { return h.id() < id; });
     if (i != v.cend() && i->id() == t.m_id)
       v.erase(i);

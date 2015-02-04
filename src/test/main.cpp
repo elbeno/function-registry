@@ -12,7 +12,9 @@ struct type_key<void>
 
 // -----------------------------------------------------------------------------
 #include "registry.h"
+#include "registry_client.h"
 
+#include <cassert>
 #include <iostream>
 using namespace std;
 
@@ -45,25 +47,35 @@ struct type_key<MessageB>
 };
 
 // -----------------------------------------------------------------------------
+// Test counts
+
+namespace
+{
+  int a_calls = 0;
+  int b_calls = 0;
+};
+
+// -----------------------------------------------------------------------------
 // Some functions/callable objects that handle those types
 
 void f(const MessageA&)
 {
-  cout << "f(const MessageA&) called" << endl;
+  ++a_calls;
 }
 
 void g(const MessageB&)
 {
-  cout << "g(const MessageB&) called" << endl;
+  ++b_calls;
 }
 
 void byvalue_f(MessageA)
 {
-  cout << "byvalue_f(const MessageA&) called" << endl;
+  ++a_calls;
 }
 
 void byref_f(MessageA&)
 {
+  ++a_calls;
 }
 
 class Foo
@@ -71,12 +83,12 @@ class Foo
 public:
   void f(const MessageA&)
   {
-    cout << "Foo::f(const MessageA&) called" << endl;
+    ++a_calls;
   }
 };
 
 // -----------------------------------------------------------------------------
-int main(int argc, char* argv[])
+void test()
 {
   Registry r;
 
@@ -86,32 +98,90 @@ int main(int argc, char* argv[])
   //r.Register(byref_f); // fails to compile (as it should)
 
   // Lambdas
-  r.Register([] (const MessageA&)
-             { cout << "lambda (const MessageA&) called" << endl; });
-  Registry::Token t = r.Register([] (const MessageA&) mutable
-                                 { cout << "mutable lambda (const MessageA&) called" << endl; });
+  r.Register([] (const MessageA&) { ++a_calls; });
+  Registry::Token t = r.Register([] (const MessageA&) mutable { ++a_calls; });
 
-  // std::functions (made from member functions)
+  // std::functions
   Foo foo;
-  std::function<void(const MessageA&)> foo_f = [&foo] (const MessageA& a) { foo.f(a); };
+  std::function<void(const MessageA&)> foo_f =
+    [&foo] (const MessageA& a) { foo.f(a); };
   r.Register(foo_f);
 
+  // g handles MessageB
   r.Register(g);
-
-  cout << "Dispatch MessageA" << endl;
 
   MessageA a;
   r.Dispatch(a);
-
-  cout << endl << "Dispatch MessageB" << endl;
+  assert(a_calls == 5);
+  assert(b_calls == 0);
 
   MessageB b;
   r.Dispatch(b);
+  assert(a_calls == 5);
+  assert(b_calls == 1);
 
-  cout << endl << "Unregister mutable lambda" << endl;
+  a_calls = b_calls = 0;
+
   r.Unregister(t);
-  cout << "Dispatch MessageA" << endl;
   r.Dispatch(a);
+  assert(a_calls == 4);
+  assert(b_calls == 0);
 
+  a_calls = b_calls = 0;
+}
+
+class TestClient : public RegistryClient
+{
+public:
+  TestClient(Registry* r) : RegistryClient(r) {}
+};
+
+void testClient()
+{
+  Registry r;
+
+  {
+    TestClient c(&r);
+    c.Register(f);
+
+    r.Dispatch(MessageA());
+    assert(a_calls == 1);
+    assert(b_calls == 0);
+
+    c.Unregister<MessageA>();
+    r.Dispatch(MessageA());
+    assert(a_calls == 1);
+    assert(b_calls == 0);
+  }
+
+  a_calls = b_calls = 0;
+
+  {
+    TestClient c(&r);
+    c.Register(f);
+    c.Register(g);
+
+    r.Dispatch(MessageA());
+    assert(a_calls == 1);
+    assert(b_calls == 0);
+    r.Dispatch(MessageB());
+    assert(a_calls == 1);
+    assert(b_calls == 1);
+  }
+
+  r.Dispatch(MessageA());
+  r.Dispatch(MessageB());
+  assert(a_calls == 1);
+  assert(b_calls == 1);
+
+  a_calls = b_calls = 0;
+}
+
+int main(int argc, char* argv[])
+{
+  test();
+  testClient();
+
+  cout << "All tests passed." << endl;
   return 0;
 }
